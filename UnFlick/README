@@ -1,0 +1,9 @@
+A Flickr backup utility designed to
+ handle large photostreams. I have been
+  unable to locate one that reliably works with my 
+  wife's 15,000 and counting images.
+  
+  As long as I'm going to this much trouble
+  I'm storing both the images and the
+   metadata in a MySQL (actually MariaDB)
+   database. 
