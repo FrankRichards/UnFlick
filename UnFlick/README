@@ -7,3 +7,17 @@ A Flickr backup utility designed to
   I'm storing both the images and the
    metadata in a MySQL (actually MariaDB)
    database. 
+   
+After investing too much time, it seems that both of the
+ actually capable Python wrappers for the Flickr API are
+ seriously Python 2. DTFlickr looks possuble, but blows
+ up on a anomaly in flickr.reflction. Python-flickrapi is,
+  despite its blurb, really really old.
+  
+  Wheel, stand by to get reinvented. Actually not. I need 4
+  to 6 methods to do everything I want to do. If Flickr
+  changes the arguments, I can introspect till the cows come
+  home and it won't help.
+  
+  Urllib is not that hard.
+  
