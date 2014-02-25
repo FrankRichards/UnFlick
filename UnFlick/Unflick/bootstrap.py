@@ -268,17 +268,28 @@ class Downloadr:
         """ download
         """
         self.getfirst()
-                d = { 
+        d = { 
             api.method  : "flickr.photos.search",
             "user_id" : self.nsid,
             "per_page" : "25",
             "extras" : "url_o",
-            "auth_token" : self.token
+            "auth_token" : self.token,
+            "page" : "1"
             }
-        i = 1
-        while i <= self.numpages:
-            d
-            page = getresponse()
+        for i in range( self.numpages):
+            d["page"] = str(i+1)
+            sig = self.signCall( d )
+            url = self.urlGen( api.rest, d, sig )
+            print(url)
+            res = self.getResponse(url)
+            piclist = res.iter("photo")
+            for thispic in piclist:
+                picurl = thispic.attrib["url_o"]
+                pic = urllib.request.urlopen( picurl ).read()
+                print(pic)
+ 
+            print(res)
+
  
         #self.uploaded = shelve.open( HISTORY_FILE )
         #for image in newImages:
