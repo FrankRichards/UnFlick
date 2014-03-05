@@ -9,6 +9,9 @@ import urllib.request, urllib.error, urllib.parse
 import email.generator
 import webbrowser
 import xml.etree.ElementTree as etree
+#import mysql.connector
+import sqlite3
+import pickle
 
 #   Flickr settings
 #
@@ -268,11 +271,13 @@ class Downloadr:
         """ download
         """
         self.getfirst()
+        #cursor.execute('truncate table image')
+        #cnx.commit()
         d = { 
             api.method  : "flickr.photos.search",
             "user_id" : self.nsid,
             "per_page" : "25",
-            "extras" : "url_o",
+            "extras" : "url_o,date_taken",
             "auth_token" : self.token,
             "page" : "1"
             }
@@ -284,13 +289,44 @@ class Downloadr:
             res = self.getResponse(url)
             piclist = res.iter("photo")
             for thispic in piclist:
+                
                 picurl = thispic.attrib["url_o"]
-                pic = urllib.request.urlopen( picurl ).read()
-                print(pic)
- 
-            print(res)
-
- 
+                print( picurl)
+                img = urllib.request.urlopen( picurl ).read()
+                #print(img)
+                # pic = urllib.request.urlopen( picurl ).read()
+                # print(pic)
+                #note, you ask for date_taken and get back datetaken 
+                
+                insertSQL = """INSERT INTO image( id , owner ,
+                secret ,server , farm , title ,
+                url_o , height_o ,width_o ,
+                date , image ) VALUES ( + 'thispic.attrib["id"]' + ,
+                'thispic.attrib["owner"]' + , + 'thispic.attrib["secret"]' + ","
+                thispic.attrib["server"] + , + thispic.attrib["farm"] + ","
+                thispic.attrib["title"] + ,
+                thispic.attrib["url_o"] + ,
+                thispic.attrib["height_o"] + ,
+                thispic.attrib["width_o"] + ,
+                thispic.attrib["datetaken"] + ,'%s')"""
+    
+                cursor.execute("""INSERT INTO image( id , owner ,
+                secret ,server , farm , title ,
+                url_o , height_o ,width_o ,
+                date , image ) VALUES ( ?, ?, ?, ?, ?, ?,
+                ?, ?, ?, ?, ?)""", ( thispic.attrib["id"], thispic.attrib["owner"],
+                                      thispic.attrib["secret"], thispic.attrib["server"],
+                                      thispic.attrib["farm"], 
+                                      thispic.attrib["title"],
+                                      thispic.attrib["url_o"],
+                                      thispic.attrib["height_o"],
+                                      thispic.attrib["width_o"],
+                                      thispic.attrib["datetaken"], img ))
+                print(thispic.attrib["id"])
+                print(type(img))
+                cnx.commit()
+                #cursor.execute("update table image set image = %s where id = %s",(('silly string', \'11111111111)))
+                #cnx.commit()
         #self.uploaded = shelve.open( HISTORY_FILE )
         #for image in newImages:
         #    self.uploadImage( image )
@@ -433,6 +469,15 @@ if __name__ == "__main__":
     flick = Downloadr()
     if ( not flick.checkToken() ):
             flick.authenticate()
+            
+    #cnx = mysql.connector.connect(user='frank', database='flickrback', password='wench99whip', port='3306', connection_timeout=3000000.0 )
+    #cursor = cnx.cursor()
+    
+    cnx = sqlite3.connect("/home/frank/flickrback")
+    cursor = cnx.cursor()
+    
+   # cursor.execute("insert into test values(1, 'fred')")
+   # cnx.commit()
     
     if ( len(sys.argv) >= 2  and sys.argv[1] == "-d"):
         flick.run()
