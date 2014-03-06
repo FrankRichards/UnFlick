@@ -9,9 +9,8 @@ import urllib.request, urllib.error, urllib.parse
 import email.generator
 import webbrowser
 import xml.etree.ElementTree as etree
-#import mysql.connector
 import sqlite3
-import pickle
+
 
 #   Flickr settings
 #
@@ -267,20 +266,24 @@ class Downloadr:
      
              
     def download( self ):
-        print('h1')
-        """ download
+        """
+        This is a full download of your Flickr account:
+        Images, sets and groups. Note, images are not duplicated, just the references
         """
         self.getfirst()
-        #cursor.execute('truncate table image')
-        #cnx.commit()
+        #SQLite version clears table.
+        cursor.execute('delete from image')
+        cnx.commit()
         d = { 
             api.method  : "flickr.photos.search",
             "user_id" : self.nsid,
             "per_page" : "25",
-            "extras" : "url_o,date_taken",
+            "extras" : "url_o,date_taken,date_upload,description",
             "auth_token" : self.token,
             "page" : "1"
             }
+        #numpages was read in getFirst().
+        #interate over pages.
         for i in range( self.numpages):
             d["page"] = str(i+1)
             sig = self.signCall( d )
@@ -288,14 +291,13 @@ class Downloadr:
             print(url)
             res = self.getResponse(url)
             piclist = res.iter("photo")
+            #iterate over images on the page
             for thispic in piclist:
                 
                 picurl = thispic.attrib["url_o"]
                 print( picurl)
                 img = urllib.request.urlopen( picurl ).read()
-                #print(img)
-                # pic = urllib.request.urlopen( picurl ).read()
-                # print(pic)
+
                 #note, you ask for date_taken and get back datetaken 
                 
                 insertSQL = """INSERT INTO image( id , owner ,
@@ -313,122 +315,21 @@ class Downloadr:
                 cursor.execute("""INSERT INTO image( id , owner ,
                 secret ,server , farm , title ,
                 url_o , height_o ,width_o ,
-                date , image ) VALUES ( ?, ?, ?, ?, ?, ?,
-                ?, ?, ?, ?, ?)""", ( thispic.attrib["id"], thispic.attrib["owner"],
+                date , upload, description, image ) VALUES ( ?, ?, ?, ?, ?, ?,
+                ?, ?, ?, ?, ?, ?, ?)""", ( int(thispic.attrib["id"]), thispic.attrib["owner"],
                                       thispic.attrib["secret"], thispic.attrib["server"],
                                       thispic.attrib["farm"], 
                                       thispic.attrib["title"],
                                       thispic.attrib["url_o"],
                                       thispic.attrib["height_o"],
                                       thispic.attrib["width_o"],
-                                      thispic.attrib["datetaken"], img ))
+                                      thispic.attrib["datetaken"],
+                                      int(thispic.attrib["dateupload"]),
+                                      thispic.find("description").text,
+                                      img ))
                 print(thispic.attrib["id"])
-                print(type(img))
                 cnx.commit()
-                #cursor.execute("update table image set image = %s where id = %s",(('silly string', \'11111111111)))
-                #cnx.commit()
-        #self.uploaded = shelve.open( HISTORY_FILE )
-        #for image in newImages:
-        #    self.uploadImage( image )
-        #self.uploaded.close()
-                   
-    
-    def uploadImage( self, image ):
-        """ uploadImage
-        """
 
-        if ( image not in self.uploaded ):
-            print(("Uploading ", image , "...",))
-            try:
-                photo = ('photo', image, open(image,'rb').read())
-                d = {
-                    api.token   : self.token,
-                    #api.perms   : self.perms,
-                    "title"     : FLICKR["title"],
-                    "description":FLICKR["description"],
-                    "tags"      : FLICKR["tags"],
-                    "is_public" : FLICKR["is_public"],
-                    "is_friend" : FLICKR["is_friend"],
-                    "is_family" : FLICKR["is_family"]
-                }
-                sig = self.signCall( d )
-                d[ api.sig ] = sig
-                d[ api.key ] = FLICKR[ api.key ]        
-                url = self.build_request(api.upload, d, (photo,))    
-                xml = urllib.request.urlopen( url ).read()
-                res = etree.fromstring(xml)
-                if ( self.isGood( res ) ):
-                    print("successful.")
-                    self.logUpload( res.find('photoid').text, image )
-                else :
-                    print("problem..")
-                    self.reportError( res )
-            except:
-                print((str(sys.exc_info())))
-
-
-    def logUpload( self, photoID, imageName ):
-        """ logUpload
-        """
-
-        photoID = str( photoID )
-        imageName = str( imageName )
-        self.uploaded[ imageName ] = photoID
-        self.uploaded[ photoID ] = imageName
-            
-    def build_request(self, theurl, fields, files, txheaders=None):
-        """
-        build_request/encode_multipart_formdata code is from www.voidspace.org.uk/atlantibots/pythonutils.html
-
-        Given the fields to set and the files to encode it returns a fully formed urllib2.Request object.
-        You can optionally pass in additional headers to encode into the object. (Content-type and Content-length will be overridden if they are set).
-        fields is a sequence of (name, value) elements for regular form fields - or a dictionary.
-        files is a sequence of (name, filename, value) elements for data to be uploaded as files.    
-        """
-
-        content_type, body = self.encode_multipart_formdata(fields, files)
-        if not txheaders: txheaders = {}
-        txheaders['Content-type'] = content_type
-        txheaders['Content-length'] = str(len(body))
-        return urllib.request.Request(theurl, body, txheaders)     
-
-    def encode_multipart_formdata(self,fields, files, BOUNDARY = '-----'+email.generator._make_boundary()+'-----'):
-        """ Encodes fields and files for uploading.
-        fields is a sequence of (name, value) elements for regular form fields - or a dictionary.
-        files is a sequence of (name, filename, value) elements for data to be uploaded as files.
-        Return (content_type, body) ready for urllib2.Request instance
-        You can optionally pass in a boundary string to use or we'll let mimetools provide one.
-        """    
-
-        CRLF = '\r\n'
-        L = []
-        if isinstance(fields, dict):
-            fields = list(fields.items())
-        for (key, value) in fields:   
-            L.append('--' + BOUNDARY)
-            L.append('Content-Disposition: form-data; name="%s"' % key)
-            L.append('')
-            L.append(value)
-        body = CRLF.join(L).encode('utf-8')
-        for (key, filename, value) in files:
-            L = []
-            filetype = mimetypes.guess_type(filename)[0] or 'application/octet-stream'
-            L.append('')
-            L.append('--' + BOUNDARY)
-            L.append('Content-Disposition: form-data; name="%s"; filename="%s"' % (key, filename))
-            L.append('Content-Type: %s' % filetype)
-            L.append('')
-            L.append('')
-            body += CRLF.join(L).encode('utf-8') + value
-        end = []
-        end.append('')
-        end.append('--' + BOUNDARY + '--')
-        end.append('')
-        body += CRLF.join(end).encode('utf-8')
-        content_type = 'multipart/form-data; boundary=%s' % BOUNDARY        # XXX what if no files are encoded
-        return content_type, body
-    
-    
     def isGood( self, res ):
         """ isGood
         """
@@ -458,28 +359,15 @@ class Downloadr:
         root = etree.fromstring( xml )
         return root
             
-
-    def run( self ):
-        """ run
-        """
-
-      
+     
 if __name__ == "__main__":
     print('howdy')
     flick = Downloadr()
     if ( not flick.checkToken() ):
             flick.authenticate()
             
-    #cnx = mysql.connector.connect(user='frank', database='flickrback', password='wench99whip', port='3306', connection_timeout=3000000.0 )
-    #cursor = cnx.cursor()
-    
+      
     cnx = sqlite3.connect("/home/frank/flickrback")
     cursor = cnx.cursor()
-    
-   # cursor.execute("insert into test values(1, 'fred')")
-   # cnx.commit()
-    
-    if ( len(sys.argv) >= 2  and sys.argv[1] == "-d"):
-        flick.run()
-    else:
-        flick.download()
+    flick.download()
+    print("all done")

@@ -20,6 +20,8 @@ CREATE TABLE image (
 	height_o int,
 	width_o int,
 	date datetime,
+	upload int,
+	description clob,
 	image blob
 );
 
