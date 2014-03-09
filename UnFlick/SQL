@@ -1,7 +1,6 @@
 drop database FLICKRDB;
 create database FLICKRDB;
 
-Images table fields
 
 CREATE TABLE config (
 	key varchar primary key,
@@ -21,9 +20,31 @@ CREATE TABLE image (
 	width_o int,
 	date datetime,
 	upload int,
+	views int,
 	description clob,
 	image blob
 );
+
+CREATE TABLE sets (
+	id int primary key,
+	primary_pic int,
+	secret char(12),
+	server int,
+	farm int,
+	photos int,
+	videos int,
+	views int,
+	comments int,
+	date_created int,
+	date_updated int
+
+);
+
+CREATE TABLE setpics (
+	pic_id integer references images(id),
+	set_id integer references set5s(id)
+);
+	
 
 todo: figure out how to make image not null without jumping
 through too many hoops.

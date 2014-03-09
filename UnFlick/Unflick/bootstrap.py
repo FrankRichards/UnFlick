@@ -143,8 +143,24 @@ class Downloadr:
             print("You need to allow this program to access your Flickr site.")
             print("A web browser should pop open with instructions.")
             print("After you have allowed access restart uploadr.py")
-            sys.exit()    
-
+            sys.exit() 
+            
+    def getSets( self ):
+        """
+        Downloads all the set info, and then the membership
+        of each set. Per set info goes into the sets table,
+        the pid_id and set_id are foreign keys on the setpics table.   
+        """
+        cursor.execute('delete from sets')
+        cnx.commit()
+        d = { 
+            api.method  : "flickr.photosets.getList",
+            "user_id" : self.nsid,
+            "per_page" : "25",
+            "auth_token" : self.token,
+            "page" : "1"
+            }
+        
     def getToken( self ):
         """
         http://www.flickr.com/services/api/flickr.auth.getToken.html
@@ -241,7 +257,7 @@ class Downloadr:
                 print((str(sys.exc_info())))
             return False
         
-    def getfirst(self):
+    def getFirst(self):
         #Get the first page of images. The important thing
         #is the number of pages, to set up the for loop.
         d = { 
@@ -270,7 +286,7 @@ class Downloadr:
         This is a full download of your Flickr account:
         Images, sets and groups. Note, images are not duplicated, just the references
         """
-        self.getfirst()
+        self.getFirst()
         #SQLite version clears table.
         cursor.execute('delete from image')
         cnx.commit()
@@ -278,7 +294,7 @@ class Downloadr:
             api.method  : "flickr.photos.search",
             "user_id" : self.nsid,
             "per_page" : "25",
-            "extras" : "url_o,date_taken,date_upload,description",
+            "extras" : "url_o,date_taken,date_upload,description,views",
             "auth_token" : self.token,
             "page" : "1"
             }
@@ -295,7 +311,6 @@ class Downloadr:
             for thispic in piclist:
                 
                 picurl = thispic.attrib["url_o"]
-                print( picurl)
                 img = urllib.request.urlopen( picurl ).read()
 
                 #note, you ask for date_taken and get back datetaken 
@@ -315,8 +330,8 @@ class Downloadr:
                 cursor.execute("""INSERT INTO image( id , owner ,
                 secret ,server , farm , title ,
                 url_o , height_o ,width_o ,
-                date , upload, description, image ) VALUES ( ?, ?, ?, ?, ?, ?,
-                ?, ?, ?, ?, ?, ?, ?)""", ( int(thispic.attrib["id"]), thispic.attrib["owner"],
+                date , upload, views, description, image ) VALUES ( ?, ?, ?, ?, ?, ?,
+                ?, ?, ?, ?, ?, ?, ?, ?)""", ( int(thispic.attrib["id"]), thispic.attrib["owner"],
                                       thispic.attrib["secret"], thispic.attrib["server"],
                                       thispic.attrib["farm"], 
                                       thispic.attrib["title"],
@@ -325,6 +340,7 @@ class Downloadr:
                                       thispic.attrib["width_o"],
                                       thispic.attrib["datetaken"],
                                       int(thispic.attrib["dateupload"]),
+                                      int(thispic.attrib["views"]),
                                       thispic.find("description").text,
                                       img ))
                 print(thispic.attrib["id"])
@@ -369,5 +385,7 @@ if __name__ == "__main__":
       
     cnx = sqlite3.connect("/home/frank/flickrback")
     cursor = cnx.cursor()
+    cursor.execute("pragma foreign_keys=TRUE")
+    cnx.commit()
     flick.download()
     print("all done")
