@@ -288,8 +288,7 @@ class Downloadr:
         """
         self.getFirst()
         #SQLite version clears table.
-        cursor.execute('delete from image')
-        cnx.commit()
+        self.reInitDB()
         d = { 
             api.method  : "flickr.photos.search",
             "user_id" : self.nsid,
@@ -374,6 +373,54 @@ class Downloadr:
         print(xml)
         root = etree.fromstring( xml )
         return root
+    
+    def reInitDB(self):
+        """
+        Drop and recreate all the tables.
+        Don't bother vacuuming (truncating).
+        This is prelude to a full backup.
+        """
+        cursor.execute("DROP TABLE IF EXISTS setpics")
+        cursor.execute("DROP TABLE IF EXISTS sets")
+        cursor.execute("DROP TABLE IF EXISTS image")
+        cnx.commit()
+        
+        cursor.execute("""CREATE TABLE image (    
+            id int primary key,
+            owner char(12),
+            secret char(10),
+            server int,
+            farm int,
+            title varchar(120),
+            url_o varchar(120),
+            height_o int,
+            width_o int,
+            date datetime,
+            upload int,
+            views int,
+            description clob,
+            image blob
+            );""")
+        cnx.commit()
+        cursor.execute("""CREATE TABLE sets (
+            id int primary key,
+            primary_pic int,
+            secret char(12),
+            server int,
+            farm int,
+            photos int,
+            videos int,
+            views int,
+            comments int,
+            date_created int,
+            date_updated int
+        );""")
+        cnx.commit()
+        cursor.execute("""CREATE TABLE setpics (
+            pic_id integer references images(id),
+            set_id integer references set5s(id)
+        );""")
+        
             
      
 if __name__ == "__main__":

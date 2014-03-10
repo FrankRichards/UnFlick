@@ -49,14 +49,4 @@ CREATE TABLE setpics (
 todo: figure out how to make image not null without jumping
 through too many hoops.
 
-CREATE TABLE sets (
-stuff
-);
-
-CREATE TABLE inSet (
-
-	int picID foreign key,
-	int setID foreign key
-	
-);
 
