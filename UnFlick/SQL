@@ -36,7 +36,9 @@ CREATE TABLE sets (
 	views int,
 	comments int,
 	date_created int,
-	date_updated int
+	date_updated int,
+	title varchar(120),
+	description clob
 
 );
 

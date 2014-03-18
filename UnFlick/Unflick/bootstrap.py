@@ -83,7 +83,7 @@ class Downloadr:
         
  
     def authenticate( self ):
-        """ Authenticate user so we can upload images
+        """ Authenticate user so we can download images
         """
 
         print("Getting new Token")
@@ -145,22 +145,6 @@ class Downloadr:
             print("After you have allowed access restart uploadr.py")
             sys.exit() 
             
-    def getSets( self ):
-        """
-        Downloads all the set info, and then the membership
-        of each set. Per set info goes into the sets table,
-        the pid_id and set_id are foreign keys on the setpics table.   
-        """
-        cursor.execute('delete from sets')
-        cnx.commit()
-        d = { 
-            api.method  : "flickr.photosets.getList",
-            "user_id" : self.nsid,
-            "per_page" : "25",
-            "auth_token" : self.token,
-            "page" : "1"
-            }
-        
     def getToken( self ):
         """
         http://www.flickr.com/services/api/flickr.auth.getToken.html
@@ -344,7 +328,35 @@ class Downloadr:
                                       img ))
                 print(thispic.attrib["id"])
                 cnx.commit()
-
+            self.getSets()
+                
+    def getSets(self):
+        """ Download the list of sets
+        """
+        d = { 
+            api.method  : "flickr.photosets.getlist",
+            "user_id" : self.nsid,
+            "auth_token" : self.token,
+            } 
+        print("hi")      
+        sig = self.signCall( d )
+        url = self.urlGen( api.rest, d, sig )
+        print(url)
+        res = self.getResponse(url)       
+        setlist = res.iter("photoset")
+        for thisset in setlist:
+            cursor.execute("""INSERT INTO sets(id, primary_pic, secret,
+                server, farm, photos, videos, views, comments, date_created, date_updated,
+                title, description)
+                values(?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+                (int(thisset.attrib["id"]), int(thisset.attrib["primary"]), thisset.attrib["secret"],
+                int(thisset.attrib["server"]), int(thisset.attrib["farm"]),
+                int(thisset.attrib["photos"]), int(thisset.attrib["videos"]),
+                int(thisset.attrib["count_views"]), int(thisset.attrib["count_comments"]),
+                int(thisset.attrib["date_create"]), int(thisset.attrib["date_update"]),
+                thisset.find("title").text, thisset.find("description").text))
+            cnx.commit()
+                           
     def isGood( self, res ):
         """ isGood
         """
@@ -413,7 +425,9 @@ class Downloadr:
             views int,
             comments int,
             date_created int,
-            date_updated int
+            date_updated int,
+            title varchar(120),
+            description clob
         );""")
         cnx.commit()
         cursor.execute("""CREATE TABLE setpics (
@@ -424,7 +438,6 @@ class Downloadr:
             
      
 if __name__ == "__main__":
-    print('howdy')
     flick = Downloadr()
     if ( not flick.checkToken() ):
             flick.authenticate()
@@ -435,4 +448,6 @@ if __name__ == "__main__":
     cursor.execute("pragma foreign_keys=TRUE")
     cnx.commit()
     flick.download()
+    #flick.reInitDB()
+    #flick.getSets()
     print("all done")
