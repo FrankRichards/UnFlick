@@ -294,7 +294,12 @@ class Downloadr:
             for thispic in piclist:
                 
                 picurl = thispic.attrib["url_o"]
-                img = urllib.request.urlopen( picurl ).read()
+                while True:
+                    try:
+                        img = urllib.request.urlopen( picurl ).read()
+                    except urllib.error.HTTPError:
+                        continue
+                    break  #kludge. must be a better way
 
                 #note, you ask for date_taken and get back datetaken 
                 
@@ -328,7 +333,7 @@ class Downloadr:
                                       img ))
                 print(thispic.attrib["id"])
                 cnx.commit()
-            self.getSets()
+        self.getSets()
                 
     def getSets(self):
         """ Download the list of sets
@@ -356,6 +361,33 @@ class Downloadr:
                 int(thisset.attrib["date_create"]), int(thisset.attrib["date_update"]),
                 thisset.find("title").text, thisset.find("description").text))
             cnx.commit()
+            self.getSetPics(thisset.attrib["id"])
+            
+    def getSetPics(self, setID):
+        d = { 
+            api.method  : "flickr.photosets.getPhotos",
+            "user_id" : self.nsid,
+            "auth_token" : self.token,
+            "photoset_id" : setID,
+            "per_page" : "25"
+        } 
+        sig = self.signCall( d )
+        url = self.urlGen( api.rest, d, sig )
+        print(url)
+        res = self.getResponse(url)
+        setPages = int(res.find("photoset").attrib["pages"])
+        for i in range( setPages):
+            d["page"] = str(i + 1)
+            sig = self.signCall( d )
+            url = self.urlGen( api.rest, d, sig )
+            print(url)
+            res = self.getResponse(url)
+            piclist = res.iter("photo")
+            for thisPic in piclist:
+                cursor.execute("""INSERT INTO setpics(pic_id, set_id)
+                    values(?, ?)""", (int(thisPic.attrib["id"]), int(setID)))
+                cnx.commit()
+        
                            
     def isGood( self, res ):
         """ isGood
@@ -431,8 +463,8 @@ class Downloadr:
         );""")
         cnx.commit()
         cursor.execute("""CREATE TABLE setpics (
-            pic_id integer references images(id),
-            set_id integer references set5s(id)
+            pic_id integer references image(id),
+            set_id integer references sets(id)
         );""")
         
             
