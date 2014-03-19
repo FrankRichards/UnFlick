@@ -1,12 +1,7 @@
 import hashlib
-import mimetypes
 import os
-import shelve
-import string
 import sys
-import time
-import urllib.request, urllib.error, urllib.parse
-import email.generator
+import urllib.request, urllib.error
 import webbrowser
 import xml.etree.ElementTree as etree
 import sqlite3
@@ -85,8 +80,6 @@ class Downloadr:
     def authenticate( self ):
         """ Authenticate user so we can download images
         """
-
-        print("Getting new Token")
         self.getFrob()
         self.getAuthKey()
         self.getToken()   
@@ -135,7 +128,7 @@ class Downloadr:
         ans = ""
         try:
             webbrowser.open( url )
-            print(url)
+            #print(url)
             ans = input("Have you authenticated this application? (Y/N): ")
         except:
             print((str(sys.exc_info())))
@@ -247,20 +240,18 @@ class Downloadr:
         d = { 
             api.method  : "flickr.photos.search",
             "user_id" : self.nsid,
-            "per_page" : "25",
+            "per_page" : "100",
             "extras" : "url_o",
             "auth_token" : self.token
             }
         sig = self.signCall( d )
         url = self.urlGen( api.rest, d, sig )
-        print(url)
         res = self.getResponse(url)
         self.numpages = int(res.find("photos").attrib['pages'])
         
     def getimg(self, url):
         #fetch the image whose url is url.
         res = self.getResponse(url)
-        print(res)
         
         
      
@@ -276,7 +267,7 @@ class Downloadr:
         d = { 
             api.method  : "flickr.photos.search",
             "user_id" : self.nsid,
-            "per_page" : "25",
+            "per_page" : "100",
             "extras" : "url_o,date_taken,date_upload,description,views",
             "auth_token" : self.token,
             "page" : "1"
@@ -303,18 +294,6 @@ class Downloadr:
 
                 #note, you ask for date_taken and get back datetaken 
                 
-                insertSQL = """INSERT INTO image( id , owner ,
-                secret ,server , farm , title ,
-                url_o , height_o ,width_o ,
-                date , image ) VALUES ( + 'thispic.attrib["id"]' + ,
-                'thispic.attrib["owner"]' + , + 'thispic.attrib["secret"]' + ","
-                thispic.attrib["server"] + , + thispic.attrib["farm"] + ","
-                thispic.attrib["title"] + ,
-                thispic.attrib["url_o"] + ,
-                thispic.attrib["height_o"] + ,
-                thispic.attrib["width_o"] + ,
-                thispic.attrib["datetaken"] + ,'%s')"""
-    
                 cursor.execute("""INSERT INTO image( id , owner ,
                 secret ,server , farm , title ,
                 url_o , height_o ,width_o ,
@@ -333,7 +312,38 @@ class Downloadr:
                                       img ))
                 print(thispic.attrib["id"])
                 cnx.commit()
+                self.getPicComments(thispic.attrib["id"])
         self.getSets()
+        
+    def getPicComments(self, picID):
+        """ Grab the comments on the set
+        """
+        d = { 
+             api.method  : "flickr.photos.comments.getList",
+             "user_id" : self.nsid,
+             "auth_token" : self.token,
+             "photo_id" : picID,
+             } 
+        sig = self.signCall( d )
+        url = self.urlGen( api.rest, d, sig )
+        res = self.getResponse(url)
+        commentList = res.iter("comment")
+        for thisComment in commentList:
+            cursor.execute("""INSERT INTO comments(
+                id, author_id, author_name,date_create, permalink, text)
+                values ( ?, ?, ?, ?, ?, ?)""",
+                (thisComment.attrib["id"],
+                 thisComment.attrib["author"],
+                 thisComment.attrib["authorname"],
+                 thisComment.attrib["datecreate"],
+                 thisComment.attrib["permalink"],
+                 thisComment.text))
+            cnx.commit()
+            cursor.execute("""INSERT INTO piccomments (
+                pic_id, comment_id) values (?, ?)""",
+                (picID, thisComment.attrib["id"]))
+            cnx.commit()
+
                 
     def getSets(self):
         """ Download the list of sets
@@ -343,10 +353,8 @@ class Downloadr:
             "user_id" : self.nsid,
             "auth_token" : self.token,
             } 
-        print("hi")      
         sig = self.signCall( d )
         url = self.urlGen( api.rest, d, sig )
-        print(url)
         res = self.getResponse(url)       
         setlist = res.iter("photoset")
         for thisset in setlist:
@@ -373,7 +381,6 @@ class Downloadr:
         } 
         sig = self.signCall( d )
         url = self.urlGen( api.rest, d, sig )
-        print(url)
         res = self.getResponse(url)
         setPages = int(res.find("photoset").attrib["pages"])
         for i in range( setPages):
@@ -387,8 +394,37 @@ class Downloadr:
                 cursor.execute("""INSERT INTO setpics(pic_id, set_id)
                     values(?, ?)""", (int(thisPic.attrib["id"]), int(setID)))
                 cnx.commit()
-        
-                           
+                
+    def getSetComments(self, setID):
+        """ Grab the comments on the set
+        """
+        d = { 
+            api.method  : "flickr.photosets.comments.getList",
+            "user_id" : self.nsid,
+            "auth_token" : self.token,
+            "photoset_id" : setID,
+        } 
+        sig = self.signCall( d )
+        url = self.urlGen( api.rest, d, sig )
+        print(url)
+        res = self.getResponse(url)
+        commentList = res.iter("comment")
+        for thisComment in commentList:
+            cursor.execute("""INSERT INTO comments(
+                id, author_id, author_name,date_create, permalink, text)
+                values ( ?, ?, ?, ?, ?, ?)""",
+                (thisComment.attrib["id"],
+                thisComment.attrib["author"],
+                thisComment.attrib["authorname"],
+                thisComment.attrib["date_create"],
+                thisComment.attrib["permalink"],
+                thisComment.text))
+            cnx.commit()
+            cursor.execute("""INSERT INTO setcomments (
+                set_id, comment_id) values (?, ?)""",
+                (setID, thisComment.attrib["id"]))
+            cnx.commit()
+            
     def isGood( self, res ):
         """ isGood
         """
@@ -425,6 +461,9 @@ class Downloadr:
         This is prelude to a full backup.
         """
         cursor.execute("DROP TABLE IF EXISTS setpics")
+        cursor.execute("DROP TABLE IF EXISTS setcomments")
+        cursor.execute("DROP TABLE IF EXISTS piccomments")
+        cursor.execute("DROP TABLE IF EXISTS comments")
         cursor.execute("DROP TABLE IF EXISTS sets")
         cursor.execute("DROP TABLE IF EXISTS image")
         cnx.commit()
@@ -462,6 +501,24 @@ class Downloadr:
             description clob
         );""")
         cnx.commit()
+        cursor.execute("""CREATE TABLE comments (
+            id varchar(40) primary key,
+            author_id varchar(20),
+            author_name varchar(72),
+            date_create int,
+            permalink varchar(100),
+            text clob
+        );""")
+        cnx.commit()
+        cursor.execute("""CREATE TABLE setcomments (
+            set_id integer references sets(id),
+            comment_id varchar(40) references comments(id)
+        );""")
+        cnx.commit()
+        cursor.execute("""CREATE TABLE piccomments (
+            pic_id int references image(id),
+            comment_id varchar(40) references comments(id)
+        );""")
         cursor.execute("""CREATE TABLE setpics (
             pic_id integer references image(id),
             set_id integer references sets(id)
@@ -475,7 +532,7 @@ if __name__ == "__main__":
             flick.authenticate()
             
       
-    cnx = sqlite3.connect("/home/frank/flickrback")
+    cnx = sqlite3.connect('/home/frank/flickrback')
     cursor = cnx.cursor()
     cursor.execute("pragma foreign_keys=TRUE")
     cnx.commit()

@@ -44,7 +44,26 @@ CREATE TABLE sets (
 
 CREATE TABLE setpics (
 	pic_id integer references images(id),
-	set_id integer references set5s(id)
+	set_id integer references sets(id)
+);
+
+CREATE TABLE comments (
+	id varchar(40) primary key,
+	author_id varchar(20),
+	author_name varchar(72),
+	date_create int,
+	permalink varchar(100),
+	text clob
+	);
+	
+CREATE TABLE setcomments (
+	set_id integer references sets(id),
+	comment_id varchar(40) references comments(id)
+);
+
+CREATE TABLE piccomments (
+	pic_id int references image(id),
+	comment_id varchar(40) references comments(id)
 );
 	
 
